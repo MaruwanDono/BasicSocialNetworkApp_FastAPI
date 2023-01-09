@@ -124,10 +124,45 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/users/{user_id}/posts/", response_model=schemas.Post)
 def create_post_for_user(
-    post: schemas.PostCreate, current_user: schemas.User = Depends(get_current_active_user), db: Session = Depends(get_db)
+    post: schemas.PostCreate,
+    current_user: schemas.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
-    print(current_user)
     return crud.create_user_post(db=db, post=post, user_id=current_user.id)
+
+
+@app.delete("/users/{user_id}/posts/{post_id}")
+def delete_post_for_user(
+    post_id: int,
+    current_user: schemas.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        return crud.delete_user_post(db=db, post_id=post_id)
+    except Exception as e:
+        return {
+            "error": e,
+            "detail": e.orig.args if hasattr(e, 'orig') else f"{e}"
+        }
+
+
+@app.put("/users/{user_id}/posts/{post_id}")
+def like_dislike_post_for_user(
+    post_id: int,
+    like: bool,
+    current_user: schemas.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        if like:
+            return crud.like_user_post(db=db, post_id=post_id)
+        else:
+            return crud.dislike_user_post(db=db, post_id=post_id)
+    except Exception as e:
+        return {
+            "error": e,
+            "detail": e.orig.args if hasattr(e, 'orig') else f"{e}"
+        }
 
 
 @app.get("/posts/", response_model=list[schemas.Post])
