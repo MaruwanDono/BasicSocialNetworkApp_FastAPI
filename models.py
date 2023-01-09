@@ -38,3 +38,15 @@ class Post(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="posts")
+    interactions = relationship("Interaction", back_populates="post")
+
+
+class Interaction(Base):
+    __tablename__ = "interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer)
+    post_interaction = Column(Boolean)
+    post_id = Column(Integer, ForeignKey("posts.id"))
+
+    post = relationship("Post", back_populates="interactions")

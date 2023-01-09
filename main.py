@@ -138,7 +138,7 @@ def delete_post_for_user(
     db: Session = Depends(get_db)
 ):
     try:
-        return crud.delete_user_post(db=db, post_id=post_id)
+        return crud.delete_user_post(db=db, post_id=post_id, user_id=current_user.id)
     except Exception as e:
         return {
             "error": e,
@@ -155,9 +155,9 @@ def like_dislike_post_for_user(
 ):
     try:
         if like:
-            return crud.like_user_post(db=db, post_id=post_id)
+            return crud.like_user_post(db=db, post_id=post_id, user_id=current_user.id)
         else:
-            return crud.dislike_user_post(db=db, post_id=post_id)
+            return crud.dislike_user_post(db=db, post_id=post_id, user_id=current_user.id)
     except Exception as e:
         return {
             "error": e,

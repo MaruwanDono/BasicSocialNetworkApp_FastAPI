@@ -1,6 +1,17 @@
 from pydantic import BaseModel
 
 
+#Interaction model
+class Interaction(BaseModel):
+    id: int
+    user_id: int
+    post_interaction: bool
+    post_id: int
+
+    class Config:
+        orm_mode = True
+
+
 #Post model
 class PostBase(BaseModel):
     content: str | None = None
@@ -15,11 +26,13 @@ class Post(PostBase):
     number_of_likes: int
     number_of_dislikes: int
     owner_id: int
+    interactions: list[Interaction] = []
 
     class Config:
         orm_mode = True
 
 
+#Token model
 class Token(BaseModel):
     access_token: str
     token_type: str
