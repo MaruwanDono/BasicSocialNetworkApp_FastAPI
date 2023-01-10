@@ -146,7 +146,7 @@ def delete_post_for_user(
         }
 
 
-@app.put("/users/{user_id}/posts/{post_id}")
+@app.put("/posts/{post_id}")
 def like_dislike_post_for_user(
     post_id: int,
     like: bool,
@@ -158,6 +158,22 @@ def like_dislike_post_for_user(
             return crud.like_user_post(db=db, post_id=post_id, user_id=current_user.id)
         else:
             return crud.dislike_user_post(db=db, post_id=post_id, user_id=current_user.id)
+    except Exception as e:
+        return {
+            "error": e,
+            "detail": e.orig.args if hasattr(e, 'orig') else f"{e}"
+        }
+
+
+@app.put("/users/{user_id}/posts/{post_id}")
+def edit_own_posts(
+    post_id: int,
+    new_content: str,
+    current_user: schemas.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        return crud.edit_user_post(db=db, post_id=post_id, user_id=current_user.id, new_content=new_content)
     except Exception as e:
         return {
             "error": e,
