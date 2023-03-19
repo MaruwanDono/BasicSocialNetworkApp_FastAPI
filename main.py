@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Union
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -23,6 +24,18 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+#CORS for frontend integration
+origins = [
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Dependency
 def get_db():
@@ -33,8 +46,8 @@ def get_db():
         db.close()
 
 
-def authenticate_user(db, email: str, password: str):
-    user = crud.get_user_by_email(db, email)
+async def authenticate_user(db, email: str, password: str):
+    user = await  crud.get_user_by_email(db, email)
     if not user:
         return False
     if not crud.verify_password(password, user.hashed_password):
@@ -67,7 +80,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         token_data = schemas.TokenData(email=email)
     except JWTError:
         raise credentials_exception
-    user = crud.get_user_by_email(db, email=token_data.email)
+    user = await crud.get_user_by_email(db, email=token_data.email)
     if user is None:
         raise credentials_exception
     return user
@@ -81,7 +94,7 @@ async def get_current_active_user(current_user: schemas.User = Depends(get_curre
 
 @app.post("/token", response_model=schemas.Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -101,44 +114,45 @@ def read_root():
 
 
 @app.post("/users/", response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
+async def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = await crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return crud.create_user(db=db, user=user)
+    new_user = await crud.create_user(db=db, user=user)
+    return new_user
 
 
 @app.get("/users/", response_model=list[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    users = crud.get_users(db, skip=skip, limit=limit)
+async def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = await crud.get_users(db, skip=skip, limit=limit)
     return users
 
 
 @app.get("/users/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = crud.get_user(db, user_id=user_id)
+async def read_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = await crud.get_user(db, user_id=user_id)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
 
 @app.post("/users/{user_id}/posts/", response_model=schemas.Post)
-def create_post_for_user(
+async def create_post_for_user(
     post: schemas.PostCreate,
     current_user: schemas.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    return crud.create_user_post(db=db, post=post, user_id=current_user.id)
+    return await crud.create_user_post(db=db, post=post, user_id=current_user.id)
 
 
 @app.delete("/users/{user_id}/posts/{post_id}")
-def delete_post_for_user(
+async def delete_post_for_user(
     post_id: int,
     current_user: schemas.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        return crud.delete_user_post(db=db, post_id=post_id, user_id=current_user.id)
+        return await crud.delete_user_post(db=db, post_id=post_id, user_id=current_user.id)
     except Exception as e:
         return {
             "error": e,
@@ -147,7 +161,7 @@ def delete_post_for_user(
 
 
 @app.put("/posts/{post_id}")
-def like_dislike_post_for_user(
+async def like_dislike_post_for_user(
     post_id: int,
     like: bool,
     current_user: schemas.User = Depends(get_current_active_user),
@@ -155,9 +169,9 @@ def like_dislike_post_for_user(
 ):
     try:
         if like:
-            return crud.like_user_post(db=db, post_id=post_id, user_id=current_user.id)
+            return await crud.like_user_post(db=db, post_id=post_id, user_id=current_user.id)
         else:
-            return crud.dislike_user_post(db=db, post_id=post_id, user_id=current_user.id)
+            return await crud.dislike_user_post(db=db, post_id=post_id, user_id=current_user.id)
     except Exception as e:
         return {
             "error": e,
@@ -166,14 +180,14 @@ def like_dislike_post_for_user(
 
 
 @app.put("/users/{user_id}/posts/{post_id}")
-def edit_own_posts(
+async def edit_own_posts(
     post_id: int,
     new_content: str,
     current_user: schemas.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        return crud.edit_user_post(db=db, post_id=post_id, user_id=current_user.id, new_content=new_content)
+        return await crud.edit_user_post(db=db, post_id=post_id, user_id=current_user.id, new_content=new_content)
     except Exception as e:
         return {
             "error": e,
@@ -182,8 +196,8 @@ def edit_own_posts(
 
 
 @app.get("/posts/", response_model=list[schemas.Post])
-def read_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    posts = crud.get_posts(db, skip=skip, limit=limit)
+async def read_posts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    posts = await crud.get_posts(db, skip=skip, limit=limit)
     return posts
 
 
